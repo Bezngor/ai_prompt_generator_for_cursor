@@ -81,11 +81,21 @@ jobs:
             # Login to GHCR on the remote server using GITHUB_TOKEN
             echo "$GITHUB_TOKEN" | docker login $REGISTRY -u "${{ github.actor }}" --password-stdin
 
-            # Stop and remove old container if it exists
-            if [ "$(docker ps -q -f name=ai-prompt-generator)" ]; then
-              docker stop ai-prompt-generator
-              docker rm ai-prompt-generator
+            # Stop and remove old container if it exists (force remove)
+            if [ "$(docker ps -aq -f name=ai-prompt-generator)" ]; then
+              docker stop ai-prompt-generator || true
+              docker rm -f ai-prompt-generator || true
             fi
+
+            # Kill any process using port 8080 (if not a Docker container)
+            if command -v lsof > /dev/null; then
+              lsof -ti:8080 | xargs kill -9 2>/dev/null || true
+            elif command -v fuser > /dev/null; then
+              fuser -k 8080/tcp 2>/dev/null || true
+            fi
+
+            # Wait a moment for port to be released
+            sleep 2
 
             # Pull latest image
             docker pull $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
