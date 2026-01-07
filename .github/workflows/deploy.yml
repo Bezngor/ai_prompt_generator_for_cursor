@@ -10,8 +10,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-  IMAGE_NAME_LOWER: ${{ toLower(github.repository) }}
   IMAGE_TAG: latest
 
 jobs:
@@ -25,6 +23,12 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+
+      - name: Set image name to lowercase
+        id: image-name
+        run: |
+          IMAGE_NAME_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "image_name=$IMAGE_NAME_LOWER" >> $GITHUB_OUTPUT
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -43,14 +47,20 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ env.IMAGE_TAG }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ steps.image-name.outputs.image_name }}:${{ env.IMAGE_TAG }}
+            ${{ env.REGISTRY }}/${{ steps.image-name.outputs.image_name }}:${{ github.sha }}
 
   deploy:
     runs-on: ubuntu-latest
     needs: build-and-push
 
     steps:
+      - name: Set image name to lowercase
+        id: image-name
+        run: |
+          IMAGE_NAME_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "image_name=$IMAGE_NAME_LOWER" >> $GITHUB_OUTPUT
+
       - name: SSH to remote server and deploy
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -71,7 +81,7 @@ jobs:
             fi
 
             # Pull latest image
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ env.IMAGE_TAG }}
+            docker pull ${{ env.REGISTRY }}/${{ steps.image-name.outputs.image_name }}:${{ env.IMAGE_TAG }}
 
             # Run new container
             docker run -d \
@@ -79,4 +89,4 @@ jobs:
               --restart unless-stopped \
               -e BOT_TOKEN=${{ secrets.BOT_TOKEN }} \
               -p 8080:8080 \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ env.IMAGE_TAG }}
+              ${{ env.REGISTRY }}/${{ steps.image-name.outputs.image_name }}:${{ env.IMAGE_TAG }}
