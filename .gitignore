@@ -45,6 +45,7 @@ bot.log
 # Exports
 exports/
 *.txt
+!requirements.txt
 
 # OS
 .DS_Store
