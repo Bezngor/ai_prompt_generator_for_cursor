@@ -81,7 +81,25 @@ jobs:
             # Login to GHCR on the remote server using GITHUB_TOKEN
             echo "$GITHUB_TOKEN" | docker login $REGISTRY -u "${{ github.actor }}" --password-stdin
 
-            # Stop and remove old container if it exists (force remove)
+            # Find and stop any container using port 8080
+            # Method 1: Check all running containers for port 8080
+            for CONTAINER_ID in $(docker ps -q); do
+              if docker port $CONTAINER_ID 2>/dev/null | grep -q ":8080"; then
+                echo "Found container $CONTAINER_ID using port 8080, stopping it..."
+                docker stop $CONTAINER_ID || true
+                docker rm -f $CONTAINER_ID || true
+              fi
+            done
+            
+            # Method 2: Also check by port mapping pattern
+            CONTAINER_USING_PORT=$(docker ps --format "{{.ID}}\t{{.Ports}}" | grep -E "0.0.0.0:8080|:::8080|8080->" | cut -f1 | head -1)
+            if [ -n "$CONTAINER_USING_PORT" ]; then
+              echo "Stopping container using port 8080 (method 2): $CONTAINER_USING_PORT"
+              docker stop $CONTAINER_USING_PORT || true
+              docker rm -f $CONTAINER_USING_PORT || true
+            fi
+
+            # Stop and remove old container by name (force remove)
             if [ "$(docker ps -aq -f name=ai-prompt-generator)" ]; then
               docker stop ai-prompt-generator || true
               docker rm -f ai-prompt-generator || true
@@ -95,7 +113,15 @@ jobs:
             fi
 
             # Wait a moment for port to be released
-            sleep 2
+            sleep 3
+
+            # Verify port is free
+            if command -v netstat > /dev/null; then
+              if netstat -tuln | grep -q ":8080 "; then
+                echo "Warning: Port 8080 is still in use"
+                netstat -tuln | grep ":8080 " || true
+              fi
+            fi
 
             # Pull latest image
             docker pull $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
