@@ -69,12 +69,15 @@ jobs:
           IMAGE_NAME: ${{ steps.image-name.outputs.image_name }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: GITHUB_TOKEN,REGISTRY,IMAGE_NAME,IMAGE_TAG,BOT_TOKEN
+          envs: GITHUB_TOKEN,REGISTRY,IMAGE_NAME,IMAGE_TAG,BOT_TOKEN,OPENAI_API_KEY,OPENAI_BASE_URL,LLM_MODEL
           script: |
             set -e
 
@@ -131,5 +134,8 @@ jobs:
               --name ai-prompt-generator \
               --restart unless-stopped \
               -e BOT_TOKEN="$BOT_TOKEN" \
+              -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+              -e OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.proxyapi.ru/openai/v1}" \
+              -e LLM_MODEL="${LLM_MODEL:-gpt-4o-mini}" \
               -p 8080:8080 \
               $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
