@@ -68,25 +68,32 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            set -e
+          envs: GITHUB_TOKEN,REGISTRY,IMAGE_NAME,IMAGE_TAG,BOT_TOKEN
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_NAME: ${{ steps.image-name.outputs.image_name }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        script: |
+          set -e
 
-            # Login to GHCR on the remote server
-            echo "${{ secrets.GHCR_PAT }}" | docker login ${{ env.REGISTRY }} -u ${{ secrets.GHCR_USER }} --password-stdin
+          # Login to GHCR on the remote server using GITHUB_TOKEN
+          echo "$GITHUB_TOKEN" | docker login $REGISTRY -u "${{ github.actor }}" --password-stdin
 
-            # Stop and remove old container if it exists
-            if [ "$(docker ps -q -f name=ai-prompt-generator)" ]; then
-              docker stop ai-prompt-generator
-              docker rm ai-prompt-generator
-            fi
+          # Stop and remove old container if it exists
+          if [ "$(docker ps -q -f name=ai-prompt-generator)" ]; then
+            docker stop ai-prompt-generator
+            docker rm ai-prompt-generator
+          fi
 
-            # Pull latest image
-            docker pull ${{ env.REGISTRY }}/${{ steps.image-name.outputs.image_name }}:${{ env.IMAGE_TAG }}
+          # Pull latest image
+          docker pull $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
 
-            # Run new container
-            docker run -d \
-              --name ai-prompt-generator \
-              --restart unless-stopped \
-              -e BOT_TOKEN=${{ secrets.BOT_TOKEN }} \
-              -p 8080:8080 \
-              ${{ env.REGISTRY }}/${{ steps.image-name.outputs.image_name }}:${{ env.IMAGE_TAG }}
+          # Run new container
+          docker run -d \
+            --name ai-prompt-generator \
+            --restart unless-stopped \
+            -e BOT_TOKEN="$BOT_TOKEN" \
+            -p 8080:8080 \
+            $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
